@@ -4,6 +4,7 @@ import './App.css'
 import teamsCallSound from './assets/audio/teams_call.mp3'
 import endCallSound from './assets/audio/end_call.mp3'
 import speakingSound from './assets/audio/speaking.mp3'
+import newMessageSound from './assets/audio/new_message.mp3'
 
 type ResponseType = 'yes' | 'no' | 'maybe' | 'ghosted'
 
@@ -20,10 +21,11 @@ function Magic8BallIcon({ size = 32 }) {
   )
 }
 
-const memeImages = [
-  'meme1.png', 'meme2.png', 'meme3.png', 'meme4.png', 'meme5.png',
-  'meme6.png', 'meme7.png', 'meme8.png', 'meme9.png', 'meme10.png'
-]
+const generateMemeImages = (count: number): string[] => {
+  return Array.from({ length: count }, (_, i) => `meme${i + 1}.png`);
+};
+
+const memeImages = generateMemeImages(30);
 
 const scapegoatExcuses = [
   "It wasn't me, it was the previous team.",
@@ -46,9 +48,9 @@ const scapegoatExcuses = [
 const sidebarChatsBase = [
   { key: 'synergy', name: 'Synergy Bot', avatar: <Magic8BallIcon size={32} /> },
   { key: 'meme', name: 'Meme Guy', avatar: '😎' },
+  { key: 'scapegoat', name: 'Scapegoat', avatar: '🐐' },
   { key: 'ninja', name: 'Ninja PM', avatar: '🦝' },
   { key: 'growth', name: 'Growth Guru', avatar: '🦖' },
-  { key: 'scapegoat', name: 'Scapegoat', avatar: '🐐' },
 ]
 
 const growthGuruLines = [
@@ -114,11 +116,7 @@ function TeamsWindowBar() {
       <span className="window-dot red" />
       <span className="window-dot yellow" />
       <span className="window-dot green" />
-      {/* Removed Teams logo, app title is now left-aligned after window dots */}
       <span className="app-title-windowbar">Magic 8-Ball Team Chat</span>
-      <button className="emoji-selector-btn" title="Choose an emoji">
-        <span role="img" aria-label="emoji">😀</span>
-      </button>
     </div>
   )
 }
@@ -148,6 +146,7 @@ function App() {
   const emojiOptions = ['😀','😁','😂','😍','😎','😢','😡','👍','🙌','🎉']
   const isMobile = window.innerWidth < 700
   const [showChatList, setShowChatList] = useState(isMobile)
+  const newMessageAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Count total user messages across all chats
   const totalUserMessages = synergyHistory.length + memeHistory.length + scapegoatHistory.length + ninjaHistory.length + groupHistory.length + growthHistory.length
@@ -321,15 +320,25 @@ function App() {
   }, [showVideoModal])
 
   // Video chat grid users
+  const animalEmojis = ['🦊','🐻','🐼','🐨','🐯','🦁','🐵','🐸','🐷','🐮','🐔','🦄','🐙','🦉','🦓','🦒','🦔','🦦','🦥','🦛','🦘','🦡','🦢','🦚','🦜','🦩','🦤','🦭','🦦','🦨','🦫','🦃','🦆','🦅','🦇','🐧','🐦','🐤','🐣','🐥','🦆','🦢','🦉','🦚','🦜','🦩','🦤','🦭','🦦','🦨','🦫']
+  function shuffle(arr: any[]) {
+    const a = [...arr]
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[a[i], a[j]] = [a[j], a[i]]
+    }
+    return a
+  }
+  const shuffledAnimals = shuffle(animalEmojis)
   const videoUsers = [
     { name: 'Ninja PM', avatar: '🦝', talking: true },
     { name: 'Synergy Bot', avatar: <Magic8BallIcon size={32} />, talking: false },
     { name: 'Blue Sky', avatar: '🐧', talking: false },
     { name: 'Growth Guru', avatar: '🦖', talking: false },
     { name: 'Goose', avatar: '🦢', talking: false },
-    { name: 'You', avatar: <Magic8BallIcon size={32} />, talking: false },
-    // Fill up to 16 users
-    ...Array.from({ length: 10 }, (_, i) => ({ name: `User ${i+1}`, avatar: '👤', talking: false }))
+    { name: 'You', avatar: '👤', talking: false },
+    // Fill up to 16 users with random animals
+    ...Array.from({ length: 10 }, (_, i) => ({ name: `User ${i+1}`, avatar: shuffledAnimals[i % shuffledAnimals.length], talking: false }))
   ]
 
   // Leave video modal with end call sound
@@ -622,11 +631,13 @@ function App() {
   } else if (activeChat === 'group') {
     chatContent = (
       <>
-        <div className="group-header-bar">
-          <span className="avatar group-header-avatar">🦝</span>
-          <span className="avatar group-header-overflow">+20</span>
-          <span className="group-header-title">SYNERGY Group Chat</span>
-        </div>
+        {activeChat === 'group' && (!isMobile) && (
+          <div className="group-header-bar">
+            <span className="avatar group-header-avatar">🦝</span>
+            <span className="avatar group-header-overflow">+20</span>
+            <span className="group-header-title">SYNERGY Group Chat</span>
+          </div>
+        )}
         <div className="message bot-message">
           <span className="avatar bot">🦝</span>
           <div className="bubble bot">
@@ -717,7 +728,7 @@ function App() {
         <div className="message bot-message">
           <span className="avatar bot">😎</span>
           <div className="bubble bot">
-            <div className="message-content">Drop your best question, and I'll drop a meme.</div>
+            <div className="message-content">Seen any good memes lately?</div>
           </div>
         </div>
         {memeHistory.map((item, i) => (
@@ -740,7 +751,7 @@ function App() {
               <div key={`bot-meme-${i}`} className="message bot-message">
                 <span className="avatar bot">😎</span>
                 <div className="bubble bot meme-bubble">
-                  <img src={'/memes/' + item.a} alt="meme" className="meme-img" onLoad={() => setTimeout(scrollToBottom, 10)} />
+                  <img src={`${import.meta.env.BASE_URL}memes/${item.a}`} alt="meme" className="meme-img" onLoad={() => setTimeout(scrollToBottom, 10)} />
                 </div>
               </div>
             )}
@@ -992,6 +1003,10 @@ function App() {
       ]))
       setLastPMFollowUp(totalUserMessages)
       setPmBadgeCount(count => count + 1)
+      if (newMessageAudioRef.current) {
+        newMessageAudioRef.current.currentTime = 0
+        newMessageAudioRef.current.play()
+      }
     }
   }, [totalUserMessages, lastPMFollowUp])
 
@@ -1051,6 +1066,7 @@ function App() {
       <audio ref={audioRef} src={teamsCallSound} preload="auto" />
       <audio ref={endAudioRef} src={endCallSound} preload="auto" />
       <audio ref={speakingAudioRef} src={speakingSound} preload="auto" />
+      <audio ref={newMessageAudioRef} src={newMessageSound} preload="auto" />
       <div className="teams-root">
         <aside className="sidebar">
           <div className="sidebar-chats">
@@ -1079,8 +1095,15 @@ function App() {
                   <span className="mobile-badge">{pmBadgeCount}</span>
                 )}
               </button>
-              <span className="mobile-chat-header-avatar">{sidebarChatsBase.find(c => c.key === activeChat)?.avatar}</span>
-              <span className="mobile-chat-header-title">{sidebarChatsBase.find(c => c.key === activeChat)?.name}</span>
+              {activeChat === 'group' ? (
+                <>
+                  <span className="mobile-chat-header-avatar group-header-avatar">🦝</span>
+                  <span className="mobile-chat-header-avatar group-header-overflow">+20</span>
+                </>
+              ) : (
+                <span className="mobile-chat-header-avatar">{sidebarChatsBase.find(c => c.key === activeChat)?.avatar}</span>
+              )}
+              <span className="mobile-chat-header-title">{activeChat === 'group' ? 'SYNERGY Group Chat' : sidebarChatsBase.find(c => c.key === activeChat)?.name}</span>
             </div>
           )}
           <header className="topbar">
@@ -1099,7 +1122,7 @@ function App() {
                 <div className="call-popup-title">Ninja PM is calling you</div>
                 <div className="call-popup-avatar-pulse">
                   <span className="call-popup-avatar">🦝</span>
-                </div>
+      </div>
                 <div className="call-popup-buttons">
                   <button className="call-btn video" onClick={handleCallAnswer} title="Video Call">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -1109,7 +1132,7 @@ function App() {
                   </button>
                   <button className="call-btn hangup" onClick={handleCallHangup} title="Hang Up">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="4" rx="2" fill="#fff"/></svg>
-                  </button>
+        </button>
                 </div>
               </div>
             </div>

@@ -828,7 +828,7 @@ body {
   word-break: break-word;
 }
 .video-leave-btn {
-  margin-top: 8px;
+  margin-top: 20px;
   padding: 12px 32px;
   background: #e00;
   color: #fff;
@@ -948,9 +948,9 @@ body {
 
 @media (max-width: 700px) {
   html, body, #root, .teams-root, .main-pane {
-    height: 100vh !important;
+    height: 100dvh !important;
     min-height: 0 !important;
-    max-height: 100vh !important;
+    max-height: 100dvh !important;
     overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -962,10 +962,10 @@ body {
     bottom: 0 !important;
     width: 100vw !important;
     margin: 0 !important;
-    padding: 0 6px env(safe-area-inset-bottom, 0) 6px !important;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    z-index: 1000;
     border-radius: 0 !important;
     background: #23272f !important;
-    z-index: 30;
     box-shadow: 0 -2px 12px rgba(0,0,0,0.10);
   }
   .chat-area {
