@@ -125,6 +125,9 @@ function TeamsWindowBar() {
       <span className="window-dot green" />
       {/* Removed Teams logo, app title is now left-aligned after window dots */}
       <span className="app-title-windowbar">Magic 8-Ball Team Chat</span>
+      <button className="emoji-selector-btn" title="Choose an emoji">
+        <span role="img" aria-label="emoji">😀</span>
+      </button>
     </div>
   )
 }
@@ -152,6 +155,8 @@ function App() {
   const [growthHistory, setGrowthHistory] = useState<{q: string, a: string | null}[]>([])
   const [lastPMFollowUp, setLastPMFollowUp] = useState(0)
   const [pmBadgeCount, setPmBadgeCount] = useState(0)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const emojiOptions = ['😀','😁','😂','😍','😎','😢','😡','👍','🙌','🎉']
 
   // Count total user messages across all chats
   const totalUserMessages = synergyHistory.length + memeHistory.length + scapegoatHistory.length + ninjaHistory.length + groupHistory.length + growthHistory.length
@@ -435,6 +440,23 @@ function App() {
     }, 100)
   }
 
+  // Add this helper for inserting emoji at cursor
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const insertEmoji = (emoji: string) => {
+    if (inputRef.current) {
+      const input = inputRef.current
+      const start = input.selectionStart || 0
+      const end = input.selectionEnd || 0
+      const value = question
+      const newValue = value.slice(0, start) + emoji + value.slice(end)
+      setQuestion(newValue)
+      setTimeout(() => {
+        input.focus()
+        input.setSelectionRange(start + emoji.length, start + emoji.length)
+      }, 0)
+    }
+  }
+
   // Render chat content based on activeChat
   let chatContent
   let chatForm
@@ -476,13 +498,38 @@ function App() {
       </>
     )
     chatForm = (
-      <form onSubmit={handleSynergySubmit} className="input-form">
+      <form onSubmit={handleSynergySubmit} className="input-form" style={{ position: 'relative' }}>
+        <button
+          type="button"
+          className="emoji-selector-btn input-emoji-btn"
+          title="Insert emoji"
+          tabIndex={0}
+          onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
+        >
+          <span role="img" aria-label="emoji">😀</span>
+        </button>
+        {showEmojiPicker && (
+          <div className="emoji-picker-popover">
+            {emojiOptions.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                className="emoji-picker-emoji"
+                onClick={e => { e.preventDefault(); insertEmoji(emoji); setShowEmojiPicker(false) }}
+                tabIndex={0}
+              >
+                <span role="img" aria-label="emoji">{emoji}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Type a new message"
           className="question-input"
+          ref={inputRef}
           disabled={isLoading}
         />
         <button 
@@ -537,13 +584,38 @@ function App() {
       </>
     )
     chatForm = (
-      <form onSubmit={handleNinjaSubmit} className="input-form">
+      <form onSubmit={handleNinjaSubmit} className="input-form" style={{ position: 'relative' }}>
+        <button
+          type="button"
+          className="emoji-selector-btn input-emoji-btn"
+          title="Insert emoji"
+          tabIndex={0}
+          onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
+        >
+          <span role="img" aria-label="emoji">😀</span>
+        </button>
+        {showEmojiPicker && (
+          <div className="emoji-picker-popover">
+            {emojiOptions.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                className="emoji-picker-emoji"
+                onClick={e => { e.preventDefault(); insertEmoji(emoji); setShowEmojiPicker(false) }}
+                tabIndex={0}
+              >
+                <span role="img" aria-label="emoji">{emoji}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Reply with a status update..."
           className="question-input"
+          ref={inputRef}
         />
         <button 
           type="submit" 
@@ -603,13 +675,38 @@ function App() {
       </>
     )
     chatForm = (
-      <form onSubmit={handleGroupSubmit} className="input-form">
+      <form onSubmit={handleGroupSubmit} className="input-form" style={{ position: 'relative' }}>
+        <button
+          type="button"
+          className="emoji-selector-btn input-emoji-btn"
+          title="Insert emoji"
+          tabIndex={0}
+          onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
+        >
+          <span role="img" aria-label="emoji">😀</span>
+        </button>
+        {showEmojiPicker && (
+          <div className="emoji-picker-popover">
+            {emojiOptions.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                className="emoji-picker-emoji"
+                onClick={e => { e.preventDefault(); insertEmoji(emoji); setShowEmojiPicker(false) }}
+                tabIndex={0}
+              >
+                <span role="img" aria-label="emoji">{emoji}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Looping in all for visibility..."
           className="question-input"
+          ref={inputRef}
           disabled={isLoading}
         />
         <button 
@@ -662,13 +759,38 @@ function App() {
       </>
     )
     chatForm = (
-      <form onSubmit={handleMemeSubmit} className="input-form">
+      <form onSubmit={handleMemeSubmit} className="input-form" style={{ position: 'relative' }}>
+        <button
+          type="button"
+          className="emoji-selector-btn input-emoji-btn"
+          title="Insert emoji"
+          tabIndex={0}
+          onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
+        >
+          <span role="img" aria-label="emoji">😀</span>
+        </button>
+        {showEmojiPicker && (
+          <div className="emoji-picker-popover">
+            {emojiOptions.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                className="emoji-picker-emoji"
+                onClick={e => { e.preventDefault(); insertEmoji(emoji); setShowEmojiPicker(false) }}
+                tabIndex={0}
+              >
+                <span role="img" aria-label="emoji">{emoji}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask for a meme..."
           className="question-input"
+          ref={inputRef}
           disabled={isLoading}
         />
         <button 
@@ -721,13 +843,38 @@ function App() {
       </>
     )
     chatForm = (
-      <form onSubmit={handleScapegoatSubmit} className="input-form">
+      <form onSubmit={handleScapegoatSubmit} className="input-form" style={{ position: 'relative' }}>
+        <button
+          type="button"
+          className="emoji-selector-btn input-emoji-btn"
+          title="Insert emoji"
+          tabIndex={0}
+          onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
+        >
+          <span role="img" aria-label="emoji">😀</span>
+        </button>
+        {showEmojiPicker && (
+          <div className="emoji-picker-popover">
+            {emojiOptions.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                className="emoji-picker-emoji"
+                onClick={e => { e.preventDefault(); insertEmoji(emoji); setShowEmojiPicker(false) }}
+                tabIndex={0}
+              >
+                <span role="img" aria-label="emoji">{emoji}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask for an excuse..."
           className="question-input"
+          ref={inputRef}
           disabled={isLoading}
         />
         <button 
@@ -780,13 +927,38 @@ function App() {
       </>
     )
     chatForm = (
-      <form onSubmit={handleGrowthSubmit} className="input-form">
+      <form onSubmit={handleGrowthSubmit} className="input-form" style={{ position: 'relative' }}>
+        <button
+          type="button"
+          className="emoji-selector-btn input-emoji-btn"
+          title="Insert emoji"
+          tabIndex={0}
+          onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
+        >
+          <span role="img" aria-label="emoji">😀</span>
+        </button>
+        {showEmojiPicker && (
+          <div className="emoji-picker-popover">
+            {emojiOptions.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                className="emoji-picker-emoji"
+                onClick={e => { e.preventDefault(); insertEmoji(emoji); setShowEmojiPicker(false) }}
+                tabIndex={0}
+              >
+                <span role="img" aria-label="emoji">{emoji}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask for motivation or a pivot..."
           className="question-input"
+          ref={inputRef}
           disabled={isLoading}
         />
         <button 
@@ -840,6 +1012,22 @@ function App() {
     }
   }, [activeChat, pmBadgeCount])
 
+  // Add click outside handler for emoji picker
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!(e.target instanceof HTMLElement)) return
+      if (!e.target.closest('.emoji-picker-popover') && !e.target.closest('.input-emoji-btn')) {
+        setShowEmojiPicker(false)
+      }
+    }
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClick)
+    } else {
+      document.removeEventListener('mousedown', handleClick)
+    }
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showEmojiPicker])
+
   return (
     <>
       <TeamsWindowBar />
@@ -882,7 +1070,7 @@ function App() {
                 <div className="call-popup-title">Ninja PM is calling you</div>
                 <div className="call-popup-avatar-pulse">
                   <span className="call-popup-avatar">🦝</span>
-                </div>
+      </div>
                 <div className="call-popup-buttons">
                   <button className="call-btn video" onClick={handleCallAnswer} title="Video Call">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="13" height="10" rx="2" fill="#6264a7"/><path d="M21 7L16 10.5V13.5L21 17V7Z" fill="#6264a7"/></svg>
@@ -892,7 +1080,7 @@ function App() {
                   </button>
                   <button className="call-btn hangup" onClick={handleCallHangup} title="Hang Up">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="4" rx="2" fill="#e00"/></svg>
-                  </button>
+        </button>
                 </div>
               </div>
             </div>
