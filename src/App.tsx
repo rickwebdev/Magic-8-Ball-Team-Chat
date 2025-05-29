@@ -51,15 +51,6 @@ const sidebarChatsBase = [
   { key: 'scapegoat', name: 'Scapegoat', avatar: '🐐' },
 ]
 
-const groupMembers = [
-  { name: 'Synergy Bot', avatar: <Magic8BallIcon size={28} /> },
-  { name: 'Blue Sky', avatar: '🐧' },
-  { name: 'Ninja PM', avatar: '🦝' },
-  { name: 'Growth Guru', avatar: '🦖' },
-  { name: 'Goose', avatar: '🦢' },
-  { name: 'You', avatar: <Magic8BallIcon size={28} /> },
-]
-
 const growthGuruLines = [
   "Time to pivot and embrace new opportunities!",
   "Let's leverage our core strengths and drive growth.",
@@ -140,11 +131,9 @@ function App() {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showNinjaBadge, setShowNinjaBadge] = useState(false)
-  const [ninjaPrompted, setNinjaPrompted] = useState(false)
   const [groupChatOpen, setGroupChatOpen] = useState(false)
   const [showCallPopup, setShowCallPopup] = useState(false)
   const [callAnswered, setCallAnswered] = useState(false)
-  const [showTyping, setShowTyping] = useState(false)
   const [showVideoModal, setShowVideoModal] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const endAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -189,7 +178,6 @@ function App() {
     if (key === 'ninja') {
       setActiveChat('ninja')
       setShowNinjaBadge(false)
-      setNinjaPrompted(true)
     } else if (key === 'synergy') {
       setActiveChat('synergy')
     } else if (key === 'group') {
@@ -1066,7 +1054,7 @@ function App() {
       <div className="teams-root">
         <aside className="sidebar">
           <div className="sidebar-chats">
-            {sidebarChats.map((chat, i) => (
+            {sidebarChats.map((chat) => (
               <div
                 key={chat.key}
                 className={`sidebar-chat${activeChat === chat.key ? ' active' : ''}`}
