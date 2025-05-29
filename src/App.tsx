@@ -157,6 +157,8 @@ function App() {
   const [pmBadgeCount, setPmBadgeCount] = useState(0)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const emojiOptions = ['😀','😁','😂','😍','😎','😢','😡','👍','🙌','🎉']
+  const isMobile = window.innerWidth < 700
+  const [showChatList, setShowChatList] = useState(isMobile)
 
   // Count total user messages across all chats
   const totalUserMessages = synergyHistory.length + memeHistory.length + scapegoatHistory.length + ninjaHistory.length + groupHistory.length + growthHistory.length
@@ -1028,6 +1030,33 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showEmojiPicker])
 
+  if (isMobile && showChatList) {
+    return (
+      <div className="mobile-chat-list-modal">
+        <div className="mobile-chat-list-header">
+          <span className="mobile-chat-list-title">Chats</span>
+          <button className="mobile-chat-list-close" onClick={() => setShowChatList(false)} aria-label="Close chat list">×</button>
+        </div>
+        <div className="mobile-chat-list-items">
+          {sidebarChatsBase.map(chat => (
+            <button
+              key={chat.key}
+              className="mobile-chat-list-item"
+              onClick={() => { setActiveChat(chat.key as ChatKey); setShowChatList(false); }}
+              style={{ position: 'relative' }}
+            >
+              <span className="mobile-chat-list-avatar">{chat.avatar}</span>
+              <span>{chat.name}</span>
+              {chat.key === 'ninja' && pmBadgeCount > 0 && (
+                <span className="mobile-badge">{pmBadgeCount}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <TeamsWindowBar />
@@ -1054,6 +1083,18 @@ function App() {
           </div>
         </aside>
         <div className="main-pane">
+          {isMobile && !showChatList && (
+            <div className="mobile-chat-header">
+              <button className="mobile-chat-header-back" onClick={() => setShowChatList(true)} aria-label="Back to chat list" style={{ position: 'relative' }}>
+                ☰
+                {pmBadgeCount > 0 && activeChat !== 'ninja' && (
+                  <span className="mobile-badge">{pmBadgeCount}</span>
+                )}
+              </button>
+              <span className="mobile-chat-header-avatar">{sidebarChatsBase.find(c => c.key === activeChat)?.avatar}</span>
+              <span className="mobile-chat-header-title">{sidebarChatsBase.find(c => c.key === activeChat)?.name}</span>
+            </div>
+          )}
           <header className="topbar">
             {/* Topbar is now minimal, app title moved to window bar */}
           </header>
@@ -1070,17 +1111,17 @@ function App() {
                 <div className="call-popup-title">Ninja PM is calling you</div>
                 <div className="call-popup-avatar-pulse">
                   <span className="call-popup-avatar">🦝</span>
-      </div>
+                </div>
                 <div className="call-popup-buttons">
                   <button className="call-btn video" onClick={handleCallAnswer} title="Video Call">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="13" height="10" rx="2" fill="#6264a7"/><path d="M21 7L16 10.5V13.5L21 17V7Z" fill="#6264a7"/></svg>
-                  </button>
-                  <button className="call-btn audio" onClick={handleCallAnswer} title="Audio Call">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#6264a7"/><path d="M8 12V10C8 8.34315 9.34315 7 11 7H13C14.6569 7 16 8.34315 16 10V12C16 13.6569 14.6569 15 13 15H11C9.34315 15 8 13.6569 8 12Z" fill="#fff"/></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="7" width="13" height="10" rx="2" fill="#fff"/>
+                      <path d="M21 7L16 10.5V13.5L21 17V7Z" fill="#fff"/>
+                    </svg>
                   </button>
                   <button className="call-btn hangup" onClick={handleCallHangup} title="Hang Up">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="4" rx="2" fill="#e00"/></svg>
-        </button>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="4" rx="2" fill="#fff"/></svg>
+                  </button>
                 </div>
               </div>
             </div>
