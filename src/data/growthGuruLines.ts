@@ -1,18 +1,11 @@
-/** Static fallback when Growth Guru LLM fails. */
+/** Static fallback when Growth Guru LLM fails (still sounds responsive, not generic KPI soup). */
 export const GROWTH_GURU_LINES: string[] = [
-  'Time to pivot and embrace new opportunities!',
-  "Let's leverage our core strengths and drive growth.",
-  'Kudos to the team for pushing the envelope!',
-  'Every challenge is a chance to innovate.',
-  "Let's circle back and optimize our strategy.",
-  "Great work! Let's keep the momentum going!",
-  'Remember: disruption is just innovation in disguise.',
-  "Let's blue-sky this and see where it takes us.",
-  'Your efforts are moving the needle!',
-  "Let's double down on our wins and iterate fast.",
-  'Synergy is the key to exponential growth!',
-  "Let's take this offline and strategize.",
-  'Keep up the great work: success is a team sport!',
-  "Let's align on our KPIs and drive results.",
-  'Innovation starts with a single idea; keep them coming!',
+  'You raised a real point; I would tighten the story into one sentence a stranger could repeat. Try that and send it back.',
+  'Fair vent. My tip: name the one thing you can ship this week, even tiny, so the week has a win on the board.',
+  'I hear you. Next step, write down what "done" looks like so your brain stops negotiating with itself.',
+  'That frustration is data. Channel it into one experiment: change a single variable and measure once.',
+  'You are not wrong to question it. Constructive angle: who is the one person whose buy-in would unblock you?',
+  'Okay, that is a lot. Pick the smallest slice you can own today; momentum beats a perfect roadmap.',
+  'If that is the hill, make sure you are not climbing it alone. Who have you actually asked for help?',
+  'Humor noted. Underneath it: what would you do if you were not afraid of looking naive?',
 ]

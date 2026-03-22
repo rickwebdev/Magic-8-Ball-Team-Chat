@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const system = typeof body.system === 'string' ? body.system : ''
   const userMessage = typeof body.userMessage === 'string' ? body.userMessage : ''
   const maxTokens =
-    typeof body.maxTokens === 'number' ? Math.min(120, Math.max(1, body.maxTokens)) : 120
+    typeof body.maxTokens === 'number' ? Math.min(160, Math.max(1, body.maxTokens)) : 120
   const temperature =
     typeof body.temperature === 'number' ? Math.min(2, Math.max(0, body.temperature)) : 0.9
 
