@@ -11,7 +11,7 @@ export interface LlmRequestBody {
 
 /**
  * Calls same-origin `/api/llm` (Vercel serverless in production).
- * Uses relative URL so it works with the site root; SPA lives under `/magic-8-ball/`.
+ * Same-origin `/api/llm`; works with Vite base `/` or a subpath.
  */
 export async function callLlm(body: LlmRequestBody): Promise<string> {
   const controller = new AbortController()

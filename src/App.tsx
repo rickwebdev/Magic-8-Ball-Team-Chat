@@ -132,7 +132,7 @@ function AboutModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <li>
             Deployed on Vercel at{' '}
             <a href={`${import.meta.env.BASE_URL}`} target="_blank" rel="noopener noreferrer">
-              /magic-8-ball/
+              {import.meta.env.BASE_URL}
             </a>
           </li>
         </ul>
