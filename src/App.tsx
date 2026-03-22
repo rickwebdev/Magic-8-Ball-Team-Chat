@@ -1,12 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { responses } from './data/responses'
+import {
+  getSynergyReply,
+  getNinjaPMReply,
+  getNinjaPMFollowUp,
+  getScapegoatReply,
+  getGrowthGuruReply,
+  getGroupChatReply,
+  nextMemeFilename,
+} from './characters'
+import { CREDIT_LINK, isEasterEggCreditQuestion } from './orchestration/easterEgg'
+import { computeTotalUserMessages } from './orchestration/globalCounter'
+import { MIN_TYPING_MS, ensureMinMsSince } from './lib/chatTiming'
 import './App.css'
 import teamsCallSound from './assets/audio/teams_call.mp3'
 import endCallSound from './assets/audio/end_call.mp3'
 import speakingSound from './assets/audio/speaking.mp3'
 import newMessageSound from './assets/audio/new_message.mp3'
-
-type ResponseType = 'yes' | 'no' | 'maybe' | 'ghosted'
 
 type ChatKey = 'synergy' | 'ninja' | 'group' | 'blue' | 'growth' | 'goose' | 'meme' | 'scapegoat'
 
@@ -21,82 +31,120 @@ function Magic8BallIcon({ size = 32 }) {
   )
 }
 
-const generateMemeImages = (count: number): string[] => {
-  return Array.from({ length: count }, (_, i) => `meme${i + 1}.png`);
-};
-
-const memeImages = generateMemeImages(30);
-
-const scapegoatExcuses = [
-  "It wasn't me, it was the previous team.",
-  "I think that was out of my scope.",
-  "I was waiting on input from Legal.",
-  "I thought you were handling that.",
-  "That was a system issue, not my fault.",
-  "I never got the email.",
-  "I was out of office that week.",
-  "I delegated that to someone else.",
-  "I flagged that as a risk in the last meeting.",
-  "I was told to prioritize something else.",
-  "I assumed it was already done.",
-  "I think IT is still looking into it.",
-  "I was just following orders.",
-  "I thought that was Bob's responsibility.",
-  "I didn't have the right permissions."
-]
-
 const sidebarChatsBase = [
   { key: 'synergy', name: 'Synergy Bot', avatar: <Magic8BallIcon size={32} /> },
   { key: 'meme', name: 'Meme Guy', avatar: '😎' },
   { key: 'scapegoat', name: 'Scapegoat', avatar: '🐐' },
-  { key: 'ninja', name: 'Ninja PM', avatar: '🦝' },
+  { key: 'ninja', name: 'Ninja PM', avatar: '🥷' },
   { key: 'growth', name: 'Growth Guru', avatar: '🦖' },
 ]
 
-const growthGuruLines = [
-  "Time to pivot and embrace new opportunities!",
-  "Let's leverage our core strengths and drive growth.",
-  "Kudos to the team for pushing the envelope!",
-  "Every challenge is a chance to innovate.",
-  "Let's circle back and optimize our strategy.",
-  "Great work! Let's keep the momentum going.",
-  "Remember: disruption is just innovation in disguise.",
-  "Let's blue-sky this and see where it takes us.",
-  "Your efforts are moving the needle!",
-  "Let's double down on our wins and iterate fast.",
-  "Synergy is the key to exponential growth!",
-  "Let's take this offline and strategize.",
-  "Keep up the great work—success is a team sport!",
-  "Let's align on our KPIs and drive results.",
-  "Innovation starts with a single idea—keep them coming!"
-]
+const INPUT_PLACEHOLDER: Record<ChatKey, string> = {
+  synergy: 'Ask for a decision...',
+  meme: 'Say anything...',
+  scapegoat: 'Tell him what went wrong...',
+  ninja: 'Give him a status update...',
+  growth: 'Describe a setback...',
+  group: 'Loop in the team...',
+  blue: 'Type a message...',
+  goose: 'Type a message...',
+}
 
-const pmFollowUps = [
-  "Can you provide a quick status update?",
-  "What are the blockers on this?",
-  "Do we have an ETA for completion?",
-  "Is this on track for delivery?",
-  "Have you looped in all stakeholders?",
-  "Can we get this prioritized?",
-  "What are the next steps?",
-  "Do you need any support from the team?",
-  "Is there a risk of scope creep?",
-  "Can you add this to the project tracker?",
-  "Let's sync up on this in the next standup.",
-  "Can you share the latest metrics?",
-  "Is this aligned with our quarterly goals?",
-  "Do we have a backup plan?",
-  "Can you summarize the action items?"
-]
+function UserAvatarBubble() {
+  return (
+    <span className="avatar user user-avatar-emoji" aria-label="You">
+      🤦
+    </span>
+  )
+}
 
-function getRandomJargon() {
-  const all = [
-    ...responses.responses.yes,
-    ...responses.responses.no,
-    ...responses.responses.maybe,
-    ...responses.responses.ghosted,
-  ]
-  return all[Math.floor(Math.random() * all.length)]
+function UserAvatarInput() {
+  return (
+    <span className="avatar user user-avatar-emoji user-avatar-emoji--input" aria-hidden>
+      🤦
+    </span>
+  )
+}
+
+function SidebarPresenceAvatar({
+  chatKey,
+  children,
+  listAvatar,
+}: {
+  chatKey: ChatKey
+  children: React.ReactNode
+  /** Larger avatar styling for mobile chat list */
+  listAvatar?: boolean
+}) {
+  const away = chatKey === 'scapegoat'
+  return (
+    <span className={`sidebar-avatar-wrap${listAvatar ? ' sidebar-avatar-wrap--list' : ''}`}>
+      <span className={listAvatar ? 'mobile-chat-list-avatar' : 'avatar'}>{children}</span>
+      <span
+        className={`presence-dot ${away ? 'presence-away' : 'presence-online'}`}
+        aria-hidden
+      />
+    </span>
+  )
+}
+
+function AboutModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null
+  return (
+    <div
+      className="about-modal-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        className="about-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="about-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="about-modal-close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+        <h2 id="about-modal-title" className="about-modal-title">
+          Magic 8-Ball Team Chat
+        </h2>
+        <p className="about-modal-body">
+          A satirical Microsoft Teams parody populated by the coworkers you&apos;ve definitely never met.
+          Each character is powered by a persona-specific system prompt. Replies reference what you actually
+          say; the absurdity is intentional.
+        </p>
+        <h3 className="about-modal-heading">How it&apos;s built</h3>
+        <ul className="about-modal-list">
+          <li>Vite + React + TypeScript</li>
+          <li>OpenAI API (GPT-4o) with per-character system prompts</li>
+          <li>
+            Two-layer architecture: deterministic orchestration layer (call popup, badge logic, typing
+            indicators, message counters) + LLM copy layer (character reply generation)
+          </li>
+          <li>
+            Character outcomes like Synergy Bot&apos;s yes/no/maybe/ghosted bucket are selected in code; the
+            LLM only phrases the result
+          </li>
+          <li>Static fallback responses on API failure</li>
+          <li>
+            Deployed on Vercel at{' '}
+            <a href={`${import.meta.env.BASE_URL}`} target="_blank" rel="noopener noreferrer">
+              /magic-8-ball/
+            </a>
+          </li>
+        </ul>
+        <p className="about-modal-footer">
+          Built by Rick ·{' '}
+          <a href="https://rickthewebdev.com/" target="_blank" rel="noopener noreferrer">
+            rickthewebdev.com
+          </a>
+        </p>
+      </div>
+    </div>
+  )
 }
 
 function TypingIndicator() {
@@ -110,15 +158,34 @@ function TypingIndicator() {
   )
 }
 
-function TeamsWindowBar() {
+function TeamsWindowBar({ onAboutClick }: { onAboutClick: () => void }) {
   return (
     <div className="teams-window-bar">
-      <span className="window-dot red" />
-      <span className="window-dot yellow" />
-      <span className="window-dot green" />
-      <span className="app-title-windowbar">Magic 8-Ball Team Chat</span>
+      <div className="teams-window-bar-left">
+        <span className="window-dot red" />
+        <span className="window-dot yellow" />
+        <span className="window-dot green" />
+      </div>
+      <div className="teams-window-bar-center">
+        <span className="app-title-windowbar">Magic 8-Ball Team Chat</span>
+        <span className="app-tagline">The workplace messaging experience.</span>
+      </div>
+      <div className="teams-window-bar-right">
+        <button type="button" className="about-btn-window" onClick={onAboutClick}>
+          About this app
+        </button>
+      </div>
     </div>
   )
+}
+
+// Add custom properties to window for TypeScript
+declare global {
+  interface Window {
+    gtagScriptLoaded?: boolean;
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
+  }
 }
 
 function App() {
@@ -143,13 +210,40 @@ function App() {
   const [lastPMFollowUp, setLastPMFollowUp] = useState(0)
   const [pmBadgeCount, setPmBadgeCount] = useState(0)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showAboutModal, setShowAboutModal] = useState(false)
   const emojiOptions = ['😀','😁','😂','😍','😎','😢','😡','👍','🙌','🎉']
   const isMobile = window.innerWidth < 700
   const [showChatList, setShowChatList] = useState(isMobile)
   const newMessageAudioRef = useRef<HTMLAudioElement | null>(null)
+  /** Last message the user sent in Ninja PM only; used for injected PM follow-ups (not other chats). */
+  const lastNinjaUserMessageRef = useRef('')
 
-  // Count total user messages across all chats
-  const totalUserMessages = synergyHistory.length + memeHistory.length + scapegoatHistory.length + ninjaHistory.length + groupHistory.length + growthHistory.length
+  useEffect(() => {
+    // Google Analytics gtag.js
+    if (!window.gtagScriptLoaded) {
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = 'https://www.googletagmanager.com/gtag/js?id=G-DXTYL1RNBC';
+      document.head.appendChild(script);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(...args: unknown[]) {
+        window.dataLayer!.push(args);
+      }
+      window.gtag = gtag;
+      window.gtag('js', new Date());
+      window.gtag('config', 'G-DXTYL1RNBC');
+      window.gtagScriptLoaded = true;
+    }
+  }, []);
+
+  const totalUserMessages = computeTotalUserMessages(
+    synergyHistory.length,
+    memeHistory.length,
+    scapegoatHistory.length,
+    ninjaHistory.length,
+    groupHistory.length,
+    growthHistory.length,
+  )
   // Show badge after 4 total user messages
   if (!showNinjaBadge && totalUserMessages >= 4 && !groupChatOpen) {
     setShowNinjaBadge(true)
@@ -190,84 +284,100 @@ function App() {
     }
   }
 
-  // Synergy Bot chat logic
   const handleSynergySubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim()) return
+    const q = question.trim()
+    if (isEasterEggCreditQuestion(q)) {
+      setSynergyHistory([...synergyHistory, { q, a: CREDIT_LINK }])
+      setQuestion('')
+      return
+    }
     setIsLoading(true)
-    // Add user message
-    setSynergyHistory([...synergyHistory, { q: question, a: null }])
+    setSynergyHistory([...synergyHistory, { q, a: null }])
     setQuestion('')
-    // Add typing indicator as a bot message
     setTimeout(() => {
-      setSynergyHistory(history => {
+      setSynergyHistory((history) => {
         const updated = [...history]
         updated[updated.length - 1].a = 'typing'
         return updated
       })
-      // After typing, replace with real response
-      setTimeout(() => {
-        setSynergyHistory(history => {
+      const typingAt = Date.now()
+      void (async () => {
+        const text = await getSynergyReply(q)
+        await ensureMinMsSince(typingAt, MIN_TYPING_MS)
+        setSynergyHistory((history) => {
           const updated = [...history]
-          const types: ResponseType[] = ['yes', 'no', 'maybe', 'ghosted']
-          const randomType = types[Math.floor(Math.random() * types.length)]
-          const resp = responses.responses[randomType][Math.floor(Math.random() * responses.responses[randomType].length)]
-          updated[updated.length - 1].a = resp
+          updated[updated.length - 1].a = text
           return updated
         })
         setIsLoading(false)
-      }, 1000)
+      })()
     }, 100)
   }
 
-  // Ninja PM chat logic
   const handleNinjaSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim()) return
-    // Add user message
-    setNinjaHistory([...ninjaHistory, { q: question, a: null }])
+    const q = question.trim()
+    if (isEasterEggCreditQuestion(q)) {
+      setNinjaHistory([...ninjaHistory, { q, a: CREDIT_LINK }])
+      setQuestion('')
+      return
+    }
+    lastNinjaUserMessageRef.current = q
+    setNinjaHistory([...ninjaHistory, { q, a: null }])
     setQuestion('')
-    // Add typing indicator as a bot message
     setTimeout(() => {
-      setNinjaHistory(history => {
+      setNinjaHistory((history) => {
         const updated = [...history]
         updated[updated.length - 1].a = 'typing'
         return updated
       })
-      // After typing, show call popup only
-      setTimeout(() => {
-        setNinjaHistory(history => {
+      const typingAt = Date.now()
+      void (async () => {
+        const text = await getNinjaPMReply(q)
+        await ensureMinMsSince(typingAt, MIN_TYPING_MS)
+        setNinjaHistory((history) => {
           const updated = [...history]
-          updated[updated.length - 1].a = 'Please join the call.'
+          updated[updated.length - 1].a = text
           return updated
         })
         setShowCallPopup(true)
         setCallAnswered(false)
-      }, 1000)
+      })()
     }, 100)
   }
 
-  // Group chat logic
   const handleGroupSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim()) return
+    const q = question.trim()
+    if (isEasterEggCreditQuestion(q)) {
+      setGroupHistory([...groupHistory, { q, a: CREDIT_LINK }])
+      setQuestion('')
+      return
+    }
     setIsLoading(true)
-    setGroupHistory([...groupHistory, { q: question, a: null }])
+    setGroupHistory([...groupHistory, { q, a: null }])
     setQuestion('')
     setTimeout(() => {
-      setGroupHistory(history => {
+      setGroupHistory((history) => {
         const updated = [...history]
         updated[updated.length - 1].a = 'typing'
         return updated
       })
-      setTimeout(() => {
-        setGroupHistory(history => {
+      const typingAt = Date.now()
+      void (async () => {
+        const text = await getGroupChatReply(q)
+        await ensureMinMsSince(typingAt, MIN_TYPING_MS)
+        setGroupHistory((history) => {
           const updated = [...history]
-          updated[updated.length - 1].a = getRandomJargon()
+          updated[updated.length - 1].a = text
           return updated
         })
         setIsLoading(false)
-      }, 1000)
+      })()
     }, 100)
   }
 
@@ -321,7 +431,7 @@ function App() {
 
   // Video chat grid users
   const animalEmojis = ['🦊','🐻','🐼','🐨','🐯','🦁','🐵','🐸','🐷','🐮','🐔','🦄','🐙','🦉','🦓','🦒','🦔','🦦','🦥','🦛','🦘','🦡','🦢','🦚','🦜','🦩','🦤','🦭','🦦','🦨','🦫','🦃','🦆','🦅','🦇','🐧','🐦','🐤','🐣','🐥','🦆','🦢','🦉','🦚','🦜','🦩','🦤','🦭','🦦','🦨','🦫']
-  function shuffle(arr: any[]) {
+  function shuffle<T>(arr: T[]): T[] {
     const a = [...arr]
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
@@ -331,12 +441,12 @@ function App() {
   }
   const shuffledAnimals = shuffle(animalEmojis)
   const videoUsers = [
-    { name: 'Ninja PM', avatar: '🦝', talking: true },
+    { name: 'Ninja PM', avatar: '🥷', talking: true },
     { name: 'Synergy Bot', avatar: <Magic8BallIcon size={32} />, talking: false },
     { name: 'Blue Sky', avatar: '🐧', talking: false },
     { name: 'Growth Guru', avatar: '🦖', talking: false },
     { name: 'Goose', avatar: '🦢', talking: false },
-    { name: 'You', avatar: '👤', talking: false },
+    { name: 'You', avatar: <span className="video-user-emoji">🤦</span>, talking: false },
     // Fill up to 16 users with random animals
     ...Array.from({ length: 10 }, (_, i) => ({ name: `User ${i+1}`, avatar: shuffledAnimals[i % shuffledAnimals.length], talking: false }))
   ]
@@ -358,30 +468,30 @@ function App() {
     setTimeout(() => setShowVideoModal(false), 500)
   }
 
-  // Meme Guy chat logic
   const handleMemeSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim()) return
+    const q = question.trim()
+    if (isEasterEggCreditQuestion(q)) {
+      setMemeHistory([...memeHistory, { q, a: CREDIT_LINK }])
+      setQuestion('')
+      return
+    }
     setIsLoading(true)
-    setMemeHistory([...memeHistory, { q: question, a: null }])
+    setMemeHistory([...memeHistory, { q, a: null }])
     setQuestion('')
     setTimeout(() => {
-      setMemeHistory(history => {
+      setMemeHistory((history) => {
         const updated = [...history]
         updated[updated.length - 1].a = 'typing'
         return updated
       })
       setTimeout(() => {
-        setMemeHistory(history => {
-          let availableMemes = memeImages.filter(m => !usedMemes.includes(m))
-          if (availableMemes.length === 0) {
-            setUsedMemes([])
-            availableMemes = [...memeImages]
-          }
-          const randomMeme = availableMemes[Math.floor(Math.random() * availableMemes.length)]
-          setUsedMemes(prev => [...prev, randomMeme])
+        const { filename, usedNext } = nextMemeFilename(usedMemes)
+        setUsedMemes(usedNext)
+        setMemeHistory((history) => {
           const updated = [...history]
-          updated[updated.length - 1].a = randomMeme
+          updated[updated.length - 1].a = filename
           return updated
         })
         setIsLoading(false)
@@ -389,53 +499,67 @@ function App() {
     }, 100)
   }
 
-  // Scapegoat chat logic
   const handleScapegoatSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim()) return
+    const q = question.trim()
+    if (isEasterEggCreditQuestion(q)) {
+      setScapegoatHistory([...scapegoatHistory, { q, a: CREDIT_LINK }])
+      setQuestion('')
+      return
+    }
     setIsLoading(true)
-    setScapegoatHistory([...scapegoatHistory, { q: question, a: null }])
+    setScapegoatHistory([...scapegoatHistory, { q, a: null }])
     setQuestion('')
     setTimeout(() => {
-      setScapegoatHistory(history => {
+      setScapegoatHistory((history) => {
         const updated = [...history]
         updated[updated.length - 1].a = 'typing'
         return updated
       })
-      setTimeout(() => {
-        setScapegoatHistory(history => {
+      const typingAt = Date.now()
+      void (async () => {
+        const text = await getScapegoatReply(q)
+        await ensureMinMsSince(typingAt, MIN_TYPING_MS)
+        setScapegoatHistory((history) => {
           const updated = [...history]
-          const excuse = scapegoatExcuses[Math.floor(Math.random() * scapegoatExcuses.length)]
-          updated[updated.length - 1].a = excuse
+          updated[updated.length - 1].a = text
           return updated
         })
         setIsLoading(false)
-      }, 1000)
+      })()
     }, 100)
   }
 
-  // Growth Guru chat logic
   const handleGrowthSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim()) return
+    const q = question.trim()
+    if (isEasterEggCreditQuestion(q)) {
+      setGrowthHistory([...growthHistory, { q, a: CREDIT_LINK }])
+      setQuestion('')
+      return
+    }
     setIsLoading(true)
-    setGrowthHistory([...growthHistory, { q: question, a: null }])
+    setGrowthHistory([...growthHistory, { q, a: null }])
     setQuestion('')
     setTimeout(() => {
-      setGrowthHistory(history => {
+      setGrowthHistory((history) => {
         const updated = [...history]
         updated[updated.length - 1].a = 'typing'
         return updated
       })
-      setTimeout(() => {
-        setGrowthHistory(history => {
+      const typingAt = Date.now()
+      void (async () => {
+        const text = await getGrowthGuruReply(q)
+        await ensureMinMsSince(typingAt, MIN_TYPING_MS)
+        setGrowthHistory((history) => {
           const updated = [...history]
-          const line = growthGuruLines[Math.floor(Math.random() * growthGuruLines.length)]
-          updated[updated.length - 1].a = line
+          updated[updated.length - 1].a = text
           return updated
         })
         setIsLoading(false)
-      }, 1000)
+      })()
     }, 100)
   }
 
@@ -474,7 +598,7 @@ function App() {
               <div className="bubble user">
                 <div className="message-content">{item.q}</div>
               </div>
-              <span className="avatar user">👤</span>
+              <UserAvatarBubble />
             </div>
             {item.a === 'typing' && (
               <div key={`typing-${i}`} className="message bot-message">
@@ -488,7 +612,13 @@ function App() {
               <div key={`bot-${i}`} className="message bot-message">
                 <span className="avatar bot"><Magic8BallIcon size={32} /></span>
                 <div className="bubble bot">
-                  <div className="message-content">{item.a}</div>
+                  <div className="message-content">
+                    {item.a === CREDIT_LINK ? (
+                      <a href={CREDIT_LINK} target="_blank" rel="noopener noreferrer">{CREDIT_LINK}</a>
+                    ) : (
+                      item.a
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -505,7 +635,7 @@ function App() {
           tabIndex={0}
           onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
         >
-          <span role="img" aria-label="emoji">😀</span>
+          <UserAvatarInput />
         </button>
         {showEmojiPicker && (
           <div className="emoji-picker-popover">
@@ -526,7 +656,7 @@ function App() {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Type a new message"
+          placeholder={INPUT_PLACEHOLDER.synergy}
           className="question-input"
           ref={inputRef}
           disabled={isLoading}
@@ -547,7 +677,7 @@ function App() {
     chatContent = (
       <>
         <div className="message bot-message">
-          <span className="avatar bot">🦝</span>
+          <span className="avatar bot">🥷</span>
           <div className="bubble bot">
             <div className="message-content">What is the status?</div>
           </div>
@@ -559,12 +689,12 @@ function App() {
                 <div className="bubble user">
                   <div className="message-content">{item.q}</div>
                 </div>
-                <span className="avatar user">👤</span>
+                <UserAvatarBubble />
               </div>
             )}
             {item.a === 'typing' && (
               <div key={`typing-ninja-${i}`} className="message bot-message">
-                <span className="avatar bot">🦝</span>
+                <span className="avatar bot">🥷</span>
                 <div className="bubble bot">
                   <TypingIndicator />
                 </div>
@@ -572,9 +702,15 @@ function App() {
             )}
             {item.a && item.a !== 'typing' && (
               <div key={`bot-ninja-${i}`} className="message bot-message">
-                <span className="avatar bot">🦝</span>
+                <span className="avatar bot">🥷</span>
                 <div className="bubble bot">
-                  <div className="message-content">{item.a}</div>
+                  <div className="message-content">
+                    {item.a === CREDIT_LINK ? (
+                      <a href={CREDIT_LINK} target="_blank" rel="noopener noreferrer">{CREDIT_LINK}</a>
+                    ) : (
+                      item.a
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -591,7 +727,7 @@ function App() {
           tabIndex={0}
           onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
         >
-          <span role="img" aria-label="emoji">😀</span>
+          <UserAvatarInput />
         </button>
         {showEmojiPicker && (
           <div className="emoji-picker-popover">
@@ -612,7 +748,7 @@ function App() {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Reply with a status update..."
+          placeholder={INPUT_PLACEHOLDER.ninja}
           className="question-input"
           ref={inputRef}
         />
@@ -633,16 +769,18 @@ function App() {
       <>
         {activeChat === 'group' && (!isMobile) && (
           <div className="group-header-bar">
-            <span className="avatar group-header-avatar">🦝</span>
+            <span className="avatar group-header-avatar">🥷</span>
             <span className="avatar group-header-overflow">+20</span>
             <span className="group-header-title">SYNERGY Group Chat</span>
           </div>
         )}
         <div className="message bot-message">
-          <span className="avatar bot">🦝</span>
+          <span className="avatar bot">🥷</span>
           <div className="bubble bot">
-      
-            <div className="message-content">Looping in the team</div>
+            <div className="sender-name">Ninja PM</div>
+            <div className="message-content">
+              Kicking off the thread: @You, let us align on ownership before the next standup.
+            </div>
           </div>
         </div>
         {groupHistory.map((item, i) => (
@@ -652,11 +790,11 @@ function App() {
                 <div className="sender-name">You</div>
                 <div className="message-content">{item.q}</div>
               </div>
-              <span className="avatar user">👤</span>
+              <UserAvatarBubble />
             </div>
             {item.a === 'typing' && (
               <div key={`typing-group-${i}`} className="message bot-message">
-                <span className="avatar bot">🦝</span>
+                <span className="avatar bot">🥷</span>
                 <div className="bubble bot">
                   <TypingIndicator />
                 </div>
@@ -664,10 +802,16 @@ function App() {
             )}
             {item.a && item.a !== 'typing' && (
               <div key={`bot-group-${i}`} className="message bot-message">
-                <span className="avatar bot">🦝</span>
+                <span className="avatar bot">🥷</span>
                 <div className="bubble bot">
                   <div className="sender-name">Ninja PM</div>
-                  <div className="message-content">{item.a}</div>
+                  <div className="message-content">
+                    {item.a === CREDIT_LINK ? (
+                      <a href={CREDIT_LINK} target="_blank" rel="noopener noreferrer">{CREDIT_LINK}</a>
+                    ) : (
+                      item.a
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -684,7 +828,7 @@ function App() {
           tabIndex={0}
           onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
         >
-          <span role="img" aria-label="emoji">😀</span>
+          <UserAvatarInput />
         </button>
         {showEmojiPicker && (
           <div className="emoji-picker-popover">
@@ -705,7 +849,7 @@ function App() {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Looping in all for visibility..."
+          placeholder={INPUT_PLACEHOLDER.group}
           className="question-input"
           ref={inputRef}
           disabled={isLoading}
@@ -737,7 +881,7 @@ function App() {
               <div className="bubble user">
                 <div className="message-content">{item.q}</div>
               </div>
-              <span className="avatar user">👤</span>
+              <UserAvatarBubble />
             </div>
             {item.a === 'typing' && (
               <div key={`typing-meme-${i}`} className="message bot-message">
@@ -768,7 +912,7 @@ function App() {
           tabIndex={0}
           onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
         >
-          <span role="img" aria-label="emoji">😀</span>
+          <UserAvatarInput />
         </button>
         {showEmojiPicker && (
           <div className="emoji-picker-popover">
@@ -789,7 +933,7 @@ function App() {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask for a meme..."
+          placeholder={INPUT_PLACEHOLDER.meme}
           className="question-input"
           ref={inputRef}
           disabled={isLoading}
@@ -821,7 +965,7 @@ function App() {
               <div className="bubble user">
                 <div className="message-content">{item.q}</div>
               </div>
-              <span className="avatar user">👤</span>
+              <UserAvatarBubble />
             </div>
             {item.a === 'typing' && (
               <div key={`typing-scapegoat-${i}`} className="message bot-message">
@@ -835,7 +979,13 @@ function App() {
               <div key={`bot-scapegoat-${i}`} className="message bot-message">
                 <span className="avatar bot">🐐</span>
                 <div className="bubble bot">
-                  <div className="message-content">{item.a}</div>
+                  <div className="message-content">
+                    {item.a === CREDIT_LINK ? (
+                      <a href={CREDIT_LINK} target="_blank" rel="noopener noreferrer">{CREDIT_LINK}</a>
+                    ) : (
+                      item.a
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -852,7 +1002,7 @@ function App() {
           tabIndex={0}
           onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
         >
-          <span role="img" aria-label="emoji">😀</span>
+          <UserAvatarInput />
         </button>
         {showEmojiPicker && (
           <div className="emoji-picker-popover">
@@ -873,7 +1023,7 @@ function App() {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask for an excuse..."
+          placeholder={INPUT_PLACEHOLDER.scapegoat}
           className="question-input"
           ref={inputRef}
           disabled={isLoading}
@@ -905,7 +1055,7 @@ function App() {
               <div className="bubble user">
                 <div className="message-content">{item.q}</div>
               </div>
-              <span className="avatar user">👤</span>
+              <UserAvatarBubble />
             </div>
             {item.a === 'typing' && (
               <div key={`typing-growth-${i}`} className="message bot-message">
@@ -919,7 +1069,13 @@ function App() {
               <div key={`bot-growth-${i}`} className="message bot-message">
                 <span className="avatar bot">🦖</span>
                 <div className="bubble bot">
-                  <div className="message-content">{item.a}</div>
+                  <div className="message-content">
+                    {item.a === CREDIT_LINK ? (
+                      <a href={CREDIT_LINK} target="_blank" rel="noopener noreferrer">{CREDIT_LINK}</a>
+                    ) : (
+                      item.a
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -936,7 +1092,7 @@ function App() {
           tabIndex={0}
           onClick={e => { e.preventDefault(); setShowEmojiPicker(v => !v) }}
         >
-          <span role="img" aria-label="emoji">😀</span>
+          <UserAvatarInput />
         </button>
         {showEmojiPicker && (
           <div className="emoji-picker-popover">
@@ -957,7 +1113,7 @@ function App() {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask for motivation or a pivot..."
+          placeholder={INPUT_PLACEHOLDER.growth}
           className="question-input"
           ref={inputRef}
           disabled={isLoading}
@@ -994,19 +1150,29 @@ function App() {
     }
   })
 
-  // After every 4th user message globally, PM follows up in Ninja PM chat and badge count increases
   useEffect(() => {
     if (totalUserMessages > 0 && totalUserMessages % 4 === 0 && lastPMFollowUp !== totalUserMessages) {
-      setNinjaHistory(history => ([
-        ...history,
-        { q: null, a: pmFollowUps[Math.floor(Math.random() * pmFollowUps.length)] }
-      ]))
       setLastPMFollowUp(totalUserMessages)
-      setPmBadgeCount(count => count + 1)
-      if (newMessageAudioRef.current) {
-        newMessageAudioRef.current.currentTime = 0
-        newMessageAudioRef.current.play()
-      }
+      setPmBadgeCount((count) => count + 1)
+      setNinjaHistory((history) => [...history, { q: null, a: 'typing' }])
+      const ctx = lastNinjaUserMessageRef.current
+      const typingAt = Date.now()
+      void (async () => {
+        const text = await getNinjaPMFollowUp(ctx)
+        await ensureMinMsSince(typingAt, MIN_TYPING_MS)
+        setNinjaHistory((history) => {
+          const updated = [...history]
+          const last = updated[updated.length - 1]
+          if (last && last.q === null && last.a === 'typing') {
+            updated[updated.length - 1] = { q: null, a: text }
+          }
+          return updated
+        })
+        if (newMessageAudioRef.current) {
+          newMessageAudioRef.current.currentTime = 0
+          void newMessageAudioRef.current.play()
+        }
+      })()
     }
   }, [totalUserMessages, lastPMFollowUp])
 
@@ -1041,14 +1207,16 @@ function App() {
           <button className="mobile-chat-list-close" onClick={() => setShowChatList(false)} aria-label="Close chat list">×</button>
         </div>
         <div className="mobile-chat-list-items">
-          {sidebarChatsBase.map(chat => (
+          {sidebarChats.map((chat) => (
             <button
               key={chat.key}
               className="mobile-chat-list-item"
               onClick={() => { setActiveChat(chat.key as ChatKey); setShowChatList(false); }}
               style={{ position: 'relative' }}
             >
-              <span className="mobile-chat-list-avatar">{chat.avatar}</span>
+              <SidebarPresenceAvatar chatKey={chat.key as ChatKey} listAvatar>
+                {chat.avatar}
+              </SidebarPresenceAvatar>
               <span>{chat.name}</span>
               {chat.key === 'ninja' && pmBadgeCount > 0 && (
                 <span className="mobile-badge">{pmBadgeCount}</span>
@@ -1062,7 +1230,7 @@ function App() {
 
   return (
     <>
-      <TeamsWindowBar />
+      <TeamsWindowBar onAboutClick={() => setShowAboutModal(true)} />
       <audio ref={audioRef} src={teamsCallSound} preload="auto" />
       <audio ref={endAudioRef} src={endCallSound} preload="auto" />
       <audio ref={speakingAudioRef} src={speakingSound} preload="auto" />
@@ -1077,7 +1245,7 @@ function App() {
                 onClick={() => handleSidebarClick(chat.key)}
                 style={{ position: 'relative' }}
               >
-                <span className="avatar">{chat.avatar}</span>
+                <SidebarPresenceAvatar chatKey={chat.key as ChatKey}>{chat.avatar}</SidebarPresenceAvatar>
                 <span className="chat-name">{chat.name}</span>
                 {chat.key === 'ninja' && pmBadgeCount > 0 && (
                   <span className="sidebar-badge">{pmBadgeCount}</span>
@@ -1097,18 +1265,22 @@ function App() {
               </button>
               {activeChat === 'group' ? (
                 <>
-                  <span className="mobile-chat-header-avatar group-header-avatar">🦝</span>
+                  <span className="mobile-chat-header-avatar group-header-avatar">🥷</span>
                   <span className="mobile-chat-header-avatar group-header-overflow">+20</span>
                 </>
               ) : (
                 <span className="mobile-chat-header-avatar">{sidebarChatsBase.find(c => c.key === activeChat)?.avatar}</span>
               )}
               <span className="mobile-chat-header-title">{activeChat === 'group' ? 'SYNERGY Group Chat' : sidebarChatsBase.find(c => c.key === activeChat)?.name}</span>
+              <button
+                type="button"
+                className="about-btn-window about-btn-window--mobile"
+                onClick={() => setShowAboutModal(true)}
+              >
+                About this app
+              </button>
             </div>
           )}
-          <header className="topbar">
-            {/* Topbar is now minimal, app title moved to window bar */}
-          </header>
           <section className="chat-area">
             <div className="chat-messages" ref={chatMessagesRef}>
               {chatContent}
@@ -1121,7 +1293,7 @@ function App() {
               <div className="call-popup-card">
                 <div className="call-popup-title">Ninja PM is calling you</div>
                 <div className="call-popup-avatar-pulse">
-                  <span className="call-popup-avatar">🦝</span>
+                  <span className="call-popup-avatar">🥷</span>
       </div>
                 <div className="call-popup-buttons">
                   <button className="call-btn video" onClick={handleCallAnswer} title="Video Call">
@@ -1139,6 +1311,7 @@ function App() {
           )}
         </div>
       </div>
+      <AboutModal open={showAboutModal} onClose={() => setShowAboutModal(false)} />
       {showVideoModal && (
         <div className="video-modal-overlay">
           <div className="video-modal-card">
